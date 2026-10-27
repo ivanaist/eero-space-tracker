@@ -52,6 +52,14 @@
       letter-spacing: 2px;
     }
 
+    .header-tagline {
+      margin-top: 12px;
+      color: #546e7a;
+      font-size: 0.85em;
+      letter-spacing: 0.5px;
+      font-family: sans-serif;
+    }
+
     /* Live Video */
     #live-section {
       background: rgba(255,255,255,0.04);
@@ -124,6 +132,15 @@
       letter-spacing: 3px;
       text-transform: uppercase;
       font-weight: bold;
+    }
+
+    .agency-tagline {
+      font-size: 0.78em;
+      color: #546e7a;
+      font-family: sans-serif;
+      font-weight: normal;
+      letter-spacing: 0;
+      margin-top: 2px;
     }
 
     .nasa .agency-name  { color: #4fc3f7; text-shadow: 0 0 10px #4fc3f7; }
@@ -510,6 +527,7 @@
   <header>
     <h1>&#x1F680; Space Launch Tracker</h1>
     <p>NASA &nbsp;&bull;&nbsp; SpaceX &nbsp;&bull;&nbsp; Blue Origin</p>
+    <p class="header-tagline">See every upcoming rocket launch and the latest photos from the Hubble Space Telescope — all in one place.</p>
   </header>
 
   <!-- Live video section -->
@@ -524,7 +542,10 @@
   <div class="agency-section nasa" id="section-nasa">
     <div class="agency-header">
       <div class="agency-logo">&#x1F310;</div>
-      <div class="agency-name">NASA</div>
+      <div>
+        <div class="agency-name">NASA</div>
+        <div class="agency-tagline">Upcoming launches from the US space agency and its partners</div>
+      </div>
     </div>
     <div class="launches-grid" id="grid-nasa">
       <div class="loading">Loading launches...</div>
@@ -535,7 +556,10 @@
   <div class="agency-section spacex" id="section-spacex">
     <div class="agency-header">
       <div class="agency-logo">&#x1F6F8;</div>
-      <div class="agency-name">SpaceX</div>
+      <div>
+        <div class="agency-name">SpaceX</div>
+        <div class="agency-tagline">Elon Musk's private rocket company — the world's most active launcher</div>
+      </div>
     </div>
     <div class="launches-grid" id="grid-spacex">
       <div class="loading">Loading launches...</div>
@@ -546,7 +570,10 @@
   <div class="agency-section blueorigin" id="section-blueorigin">
     <div class="agency-header">
       <div class="agency-logo">&#x1F30D;</div>
-      <div class="agency-name">Blue Origin</div>
+      <div>
+        <div class="agency-name">Blue Origin</div>
+        <div class="agency-tagline">Jeff Bezos's rocket company, building reusable rockets for space tourism and cargo</div>
+      </div>
     </div>
     <div class="launches-grid" id="grid-blueorigin">
       <div class="loading">Loading launches...</div>
@@ -570,7 +597,10 @@
   <div class="agency-section hubble-section" id="section-hubble">
     <div class="agency-header">
       <div class="agency-logo">&#x1F52D;</div>
-      <div class="agency-name">Hubble Space Telescope</div>
+      <div>
+        <div class="agency-name">Hubble Space Telescope</div>
+        <div class="agency-tagline">Real images of galaxies, nebulae and deep space — tap any photo to read more</div>
+      </div>
     </div>
     <div class="hubble-grid" id="grid-hubble">
       <div class="loading">Loading Hubble images...</div>
