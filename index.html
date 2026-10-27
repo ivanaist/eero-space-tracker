@@ -327,6 +327,98 @@
       line-height: 1.5;
     }
 
+    .hubble-card {
+      cursor: pointer;
+    }
+
+    .hubble-tap-hint {
+      font-size: 0.72em;
+      color: #ce93d8;
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Hubble modal ─────────────────────────────────────────────── */
+    #hubble-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0,0,0,0.92);
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    #hubble-modal.open {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .modal-inner {
+      background: #0a0a1a;
+      border: 1px solid #ce93d8;
+      border-radius: 16px;
+      max-width: 680px;
+      width: 100%;
+      margin: auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      background: rgba(206,147,216,0.15);
+      border: 1px solid #ce93d8;
+      color: #ce93d8;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 1.1em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    .modal-close:hover {
+      background: rgba(206,147,216,0.35);
+    }
+
+    .modal-photo {
+      width: 100%;
+      max-height: 400px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-title {
+      font-size: 1.1em;
+      font-weight: bold;
+      color: #e1bee7;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .modal-date {
+      font-size: 0.8em;
+      color: #78909c;
+      margin-bottom: 14px;
+    }
+
+    .modal-desc {
+      font-size: 0.85em;
+      color: #b0bec5;
+      line-height: 1.7;
+    }
+
     footer {
       text-align: center;
       padding: 40px 20px;
@@ -458,6 +550,19 @@
     </div>
     <div class="launches-grid" id="grid-blueorigin">
       <div class="loading">Loading launches...</div>
+    </div>
+  </div>
+
+  <!-- Hubble modal -->
+  <div id="hubble-modal" role="dialog" aria-modal="true">
+    <div class="modal-inner">
+      <button class="modal-close" onclick="closeHubbleModal()" aria-label="Close">&#x2715;</button>
+      <img class="modal-photo" id="modal-photo" src="" alt="">
+      <div class="modal-body">
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-date"  id="modal-date"></div>
+        <div class="modal-desc"  id="modal-desc"></div>
+      </div>
     </div>
   </div>
 
@@ -705,22 +810,53 @@ async function loadLaunches() {
 const HUBBLE_API   = 'https://images-api.nasa.gov/search?q=hubble+galaxy+nebula+observation&media_type=image&page_size=9';
 const HUBBLE_CACHE = 'hubble_images_v2';
 
+function esc(str) {
+  return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function hubbleCard(item) {
-  const d    = item.data?.[0] || {};
+  const d     = item.data?.[0] || {};
   const thumb = item.links?.[0]?.href || '';
   const title = d.title || 'Hubble Image';
   const date  = d.date_created ? new Date(d.date_created).toDateString() : '';
-  const desc  = (d.description || '').slice(0, 160);
+  const full  = d.description || '';
+  const preview = full.slice(0, 120);
   return `
-    <div class="hubble-card">
-      ${thumb ? `<img class="hubble-photo" src="${thumb}" alt="${title}" loading="lazy">` : ''}
+    <div class="hubble-card"
+         onclick="openHubbleModal('${esc(thumb)}','${esc(title)}','${esc(date)}','${esc(full)}')"
+         role="button" tabindex="0">
+      ${thumb ? `<img class="hubble-photo" src="${thumb}" alt="${esc(title)}" loading="lazy">` : ''}
       <div class="hubble-body">
         <div class="hubble-title">${title}</div>
         ${date ? `<div class="hubble-date">&#x1F4F8; ${date}</div>` : ''}
-        ${desc  ? `<div class="hubble-desc">${desc}${d.description?.length > 160 ? '&hellip;' : ''}</div>` : ''}
+        ${preview ? `<div class="hubble-desc">${preview}${full.length > 120 ? '&hellip;' : ''}</div>` : ''}
+        <div class="hubble-tap-hint">&#x1F4A5; Tap to read more</div>
       </div>
     </div>`;
 }
+
+function openHubbleModal(img, title, date, desc) {
+  document.getElementById('modal-photo').src = img;
+  document.getElementById('modal-photo').alt = title;
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-date').textContent  = date ? '📸 ' + date : '';
+  document.getElementById('modal-desc').textContent  = desc || 'No description available.';
+  const modal = document.getElementById('hubble-modal');
+  modal.classList.add('open');
+  modal.scrollTop = 0;
+}
+
+function closeHubbleModal() {
+  document.getElementById('hubble-modal').classList.remove('open');
+}
+
+// Close on backdrop click (outside the inner box)
+document.getElementById('hubble-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeHubbleModal();
+});
+
+// Close on Escape key
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHubbleModal(); });
 
 async function loadHubble() {
   const grid = document.getElementById('grid-hubble');
