@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eero's Space Launch Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Starfield */
+    #stars {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 40px 20px 30px;
+    }
+
+    header h1 {
+      font-size: 2.4em;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow: 0 0 20px #4fc3f7, 0 0 40px #4fc3f7;
+    }
+
+    header p {
+      margin-top: 10px;
+      color: #90caf9;
+      font-size: 1em;
+      letter-spacing: 2px;
+    }
+
+    /* Live Video */
+    #live-section {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid #4fc3f7;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    #live-section h2 {
+      color: #ff5252;
+      font-size: 1.1em;
+      letter-spacing: 3px;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #live-video-container {
+      position: relative;
+      padding-bottom: 30%;
+      height: 0;
+      overflow: hidden;
+      max-width: 560px;
+      margin: 0 auto;
+      border-radius: 8px;
+      background: #111;
+    }
+
+    #live-video-container iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: none;
+      border-radius: 8px;
+    }
+
+    #no-live {
+      color: #607d8b;
+      font-size: 0.95em;
+      padding: 20px;
+    }
+
+    /* Agency sections */
+    .agency-section {
+      margin-bottom: 40px;
+    }
+
+    .agency-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .agency-logo {
+      font-size: 2em;
+    }
+
+    .agency-name {
+      font-size: 1.4em;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .nasa .agency-name  { color: #4fc3f7; text-shadow: 0 0 10px #4fc3f7; }
+    .spacex .agency-name { color: #b0bec5; text-shadow: 0 0 10px #b0bec5; }
+    .blueorigin .agency-name { color: #81c784; text-shadow: 0 0 10px #81c784; }
+
+    .launches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .launch-card {
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 18px;
+      border-left: 3px solid;
+      transition: background 0.2s;
+    }
+
+    .launch-card:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .nasa .launch-card  { border-color: #4fc3f7; }
+    .spacex .launch-card { border-color: #b0bec5; }
+    .blueorigin .launch-card { border-color: #81c784; }
+
+    .launch-name {
+      font-size: 1em;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+
+    .launch-rocket {
+      font-size: 0.82em;
+      color: #90caf9;
+      margin-bottom: 10px;
+    }
+
+    .launch-info {
+      font-size: 0.78em;
+      color: #78909c;
+      margin-bottom: 4px;
+    }
+
+    .launch-info span {
+      color: #b0bec5;
+    }
+
+    .countdown {
+      margin-top: 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.82em;
+      color: #fff;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    .countdown-label {
+      color: #607d8b;
+      font-size: 0.75em;
+      margin-bottom: 2px;
+    }
+
+    .countdown-time {
+      color: #ffd54f;
+      font-size: 1.05em;
+      font-weight: bold;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.72em;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .status-go    { background: #1b5e20; color: #a5d6a7; }
+    .status-tbd   { background: #1a237e; color: #90caf9; }
+    .status-hold  { background: #b71c1c; color: #ef9a9a; }
+    .status-other { background: #263238; color: #90a4ae; }
+
+    .launch-mission {
+      font-size: 0.77em;
+      color: #78909c;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .loading {
+      text-align: center;
+      color: #4fc3f7;
+      padding: 30px;
+      letter-spacing: 2px;
+      font-size: 0.9em;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .error-msg {
+      text-align: center;
+      color: #ef9a9a;
+      padding: 20px;
+      font-size: 0.9em;
+    }
+
+    .no-launches {
+      color: #607d8b;
+      font-size: 0.9em;
+      padding: 16px;
+      text-align: center;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      color: #37474f;
+      font-size: 0.8em;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div class="content">
+  <header>
+    <h1>&#x1F680; Space Launch Tracker</h1>
+    <p>NASA &nbsp;&bull;&nbsp; SpaceX &nbsp;&bull;&nbsp; Blue Origin</p>
+  </header>
+
+  <!-- Live video section -->
+  <div id="live-section">
+    <h2>&#x1F534; Live Now</h2>
+    <div id="live-video-area">
+      <div id="no-live">No launch is live right now. Check back closer to launch time!</div>
+    </div>
+  </div>
+
+  <!-- NASA -->
+  <div class="agency-section nasa" id="section-nasa">
+    <div class="agency-header">
+      <div class="agency-logo">&#x1F310;</div>
+      <div class="agency-name">NASA</div>
+    </div>
+    <div class="launches-grid" id="grid-nasa">
+      <div class="loading">Loading launches...</div>
+    </div>
+  </div>
+
+  <!-- SpaceX -->
+  <div class="agency-section spacex" id="section-spacex">
+    <div class="agency-header">
+      <div class="agency-logo">&#x1F6F8;</div>
+      <div class="agency-name">SpaceX</div>
+    </div>
+    <div class="launches-grid" id="grid-spacex">
+      <div class="loading">Loading launches...</div>
+    </div>
+  </div>
+
+  <!-- Blue Origin -->
+  <div class="agency-section blueorigin" id="section-blueorigin">
+    <div class="agency-header">
+      <div class="agency-logo">&#x1F30D;</div>
+      <div class="agency-name">Blue Origin</div>
+    </div>
+    <div class="launches-grid" id="grid-blueorigin">
+      <div class="loading">Loading launches...</div>
+    </div>
+  </div>
+
+  <footer>Data from The Space Devs Launch Library &bull; Updates every 5 minutes</footer>
+</div>
+
+<script>
+// ── Starfield ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+let stars = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+function makeStars(n) {
+  stars = [];
+  for (let i = 0; i < n; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.5 + 0.3,
+      alpha: Math.random(),
+      delta: (Math.random() * 0.005 + 0.001) * (Math.random() < 0.5 ? 1 : -1)
+    });
+  }
+}
+
+function drawStars() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  stars.forEach(s => {
+    s.alpha += s.delta;
+    if (s.alpha <= 0 || s.alpha >= 1) s.delta *= -1;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${s.alpha})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+
+resizeCanvas();
+makeStars(300);
+drawStars();
+window.addEventListener('resize', () => { resizeCanvas(); makeStars(300); });
+
+// ── Launch data ────────────────────────────────────────────────────────────
+const BASE = 'https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=5&mode=detailed&format=json';
+
+const AGENCY_QUERIES = {
+  nasa:       BASE + '&lsp__name__icontains=nasa',
+  spacex:     BASE + '&lsp__name__icontains=spacex',
+  blueorigin: BASE + '&lsp__name__icontains=blue+origin'
+};
+
+function statusBadge(abbrev) {
+  const map = {
+    'Go':   ['Go for Launch', 'status-go'],
+    'TBD':  ['Date TBD',      'status-tbd'],
+    'TBC':  ['To Be Confirmed','status-tbd'],
+    'Hold': ['Launch Hold',   'status-hold'],
+    'Success': ['Success',    'status-go'],
+    'Failure': ['Failed',     'status-hold'],
+  };
+  const [label, cls] = map[abbrev] || [abbrev || 'Unknown', 'status-other'];
+  return `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+function formatDate(iso) {
+  if (!iso) return 'Date unknown';
+  const d = new Date(iso);
+  return d.toUTCString().replace('GMT', 'UTC');
+}
+
+function countdown(iso) {
+  if (!iso) return '';
+  const now = Date.now();
+  const target = new Date(iso).getTime();
+  const diff = target - now;
+  if (diff < 0) return '';
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
+
+function renderCard(launch) {
+  const name    = launch.name || 'Unknown Mission';
+  const rocket  = launch.rocket?.configuration?.full_name || '';
+  const site    = launch.pad?.location?.name || launch.pad?.name || 'Unknown site';
+  const date    = formatDate(launch.net);
+  const status  = launch.status?.abbrev || '';
+  const mission = launch.mission?.description || '';
+
+  return `
+    <div class="launch-card" data-net="${launch.net || ''}">
+      ${statusBadge(status)}
+      <div class="launch-name">${name}</div>
+      <div class="launch-rocket">&#x1F680; ${rocket}</div>
+      <div class="launch-info">&#x1F4CD; <span>${site}</span></div>
+      <div class="launch-info">&#x1F4C5; <span>${date}</span></div>
+      ${mission ? `<div class="launch-mission">${mission.slice(0, 150)}${mission.length > 150 ? '…' : ''}</div>` : ''}
+      <div class="countdown">
+        <div class="countdown-label">T-MINUS</div>
+        <div class="countdown-time" data-net="${launch.net || ''}">--</div>
+      </div>
+    </div>`;
+}
+
+function renderGrid(gridId, launches) {
+  const el = document.getElementById(gridId);
+  if (!launches.length) {
+    el.innerHTML = '<div class="no-launches">No upcoming launches found.</div>';
+    return;
+  }
+  el.innerHTML = launches.map(renderCard).join('');
+}
+
+function updateCountdowns() {
+  document.querySelectorAll('.countdown-time[data-net]').forEach(el => {
+    const t = countdown(el.dataset.net);
+    el.textContent = t || 'Launching soon!';
+  });
+}
+
+function checkLiveVideo(launches) {
+  const area = document.getElementById('live-video-area');
+  const noLive = document.getElementById('no-live');
+
+  // Find a launch that is currently live (status "In Flight" or within 30min of NET)
+  const now = Date.now();
+  let liveUrl = null;
+
+  for (const l of launches) {
+    const isInFlight = l.status?.abbrev === 'In Flight';
+    const netTime = l.net ? new Date(l.net).getTime() : null;
+    const nearLaunch = netTime && Math.abs(now - netTime) < 30 * 60 * 1000;
+
+    if ((isInFlight || nearLaunch) && l.vidURLs && l.vidURLs.length > 0) {
+      const yt = l.vidURLs.find(v => v.url && v.url.includes('youtube'));
+      if (yt) {
+        // Convert watch URL to embed URL
+        liveUrl = yt.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'www.youtube.com/embed/');
+        break;
+      }
+    }
+  }
+
+  if (liveUrl) {
+    area.innerHTML = `
+      <div id="live-video-container">
+        <iframe src="${liveUrl}?autoplay=1" allowfullscreen allow="autoplay"></iframe>
+      </div>`;
+  } else {
+    area.innerHTML = '<div id="no-live">No launch is live right now. Check back closer to launch time!</div>';
+  }
+}
+
+// Agency keywords for client-side verification
+const VERIFY = {
+  nasa:       ['nasa'],
+  spacex:     ['spacex'],
+  blueorigin: ['blue origin']
+};
+
+function matchesAgency(launch, agency) {
+  const lsp = (launch.launch_service_provider?.name || '').toLowerCase();
+  return VERIFY[agency].some(k => lsp.includes(k));
+}
+
+async function fetchAgency(url, agency) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('API error ' + res.status);
+  const data = await res.json();
+  const results = data.results || [];
+  return results.filter(l => matchesAgency(l, agency));
+}
+
+async function loadLaunches() {
+  try {
+    const [nasa, spacex, blueorigin] = await Promise.all([
+      fetchAgency(AGENCY_QUERIES.nasa,       'nasa'),
+      fetchAgency(AGENCY_QUERIES.spacex,     'spacex'),
+      fetchAgency(AGENCY_QUERIES.blueorigin, 'blueorigin')
+    ]);
+
+    renderGrid('grid-nasa',       nasa);
+    renderGrid('grid-spacex',     spacex);
+    renderGrid('grid-blueorigin', blueorigin);
+
+    checkLiveVideo([...nasa, ...spacex, ...blueorigin]);
+    updateCountdowns();
+
+  } catch (e) {
+    ['grid-nasa', 'grid-spacex', 'grid-blueorigin'].forEach(id => {
+      document.getElementById(id).innerHTML =
+        `<div class="error-msg">Could not load launches. Try refreshing the page.</div>`;
+    });
+  }
+}
+
+// Tick countdowns every second
+setInterval(updateCountdowns, 1000);
+// Reload launch data every 5 minutes
+setInterval(loadLaunches, 5 * 60 * 1000);
+
+loadLaunches();
+</script>
+</body>
+</html>
