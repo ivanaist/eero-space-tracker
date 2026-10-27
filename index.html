@@ -650,13 +650,47 @@ async function fetchWithCache() {
   return buckets;
 }
 
+function sortByDate(launches) {
+  return [...launches].sort((a, b) => {
+    if (!a.net) return 1;
+    if (!b.net) return -1;
+    return new Date(a.net) - new Date(b.net);
+  });
+}
+
+function reorderSectionsByDate(buckets) {
+  // Find the soonest NET per section, then render sections in that order
+  const soonest = agency => {
+    const sorted = sortByDate(buckets[agency]);
+    return sorted[0]?.net ? new Date(sorted[0].net).getTime() : Infinity;
+  };
+  const order = ['nasa', 'spacex', 'blueorigin']
+    .sort((a, b) => soonest(a) - soonest(b));
+
+  const container = document.querySelector('.content');
+  order.forEach(agency => {
+    const el = document.getElementById(`section-${agency}`);
+    if (el) container.insertBefore(el, document.getElementById('section-hubble'));
+  });
+}
+
 async function loadLaunches() {
   try {
     const buckets = await fetchWithCache();
-    renderGrid('grid-spacex',     buckets.spacex);
-    renderGrid('grid-nasa',       buckets.nasa);
-    renderGrid('grid-blueorigin', buckets.blueorigin);
-    checkLiveVideo([...buckets.spacex, ...buckets.nasa, ...buckets.blueorigin]);
+
+    // Sort each section chronologically
+    const sorted = {
+      nasa:       sortByDate(buckets.nasa),
+      spacex:     sortByDate(buckets.spacex),
+      blueorigin: sortByDate(buckets.blueorigin)
+    };
+
+    renderGrid('grid-nasa',       sorted.nasa);
+    renderGrid('grid-spacex',     sorted.spacex);
+    renderGrid('grid-blueorigin', sorted.blueorigin);
+
+    reorderSectionsByDate(sorted);
+    checkLiveVideo([...sorted.nasa, ...sorted.spacex, ...sorted.blueorigin]);
     updateCountdowns();
   } catch {
     ['grid-nasa', 'grid-spacex', 'grid-blueorigin'].forEach(id => {
@@ -667,8 +701,9 @@ async function loadLaunches() {
 }
 
 // ── Hubble images ──────────────────────────────────────────────────────────
-const HUBBLE_API   = 'https://images-api.nasa.gov/search?q=hubble+space+telescope&media_type=image&page_size=6&year_start=2023';
-const HUBBLE_CACHE = 'hubble_images_v1';
+// Science-only query: galaxies, nebulae, observations — no people or news
+const HUBBLE_API   = 'https://images-api.nasa.gov/search?q=hubble+galaxy+nebula+observation&media_type=image&page_size=9';
+const HUBBLE_CACHE = 'hubble_images_v2';
 
 function hubbleCard(item) {
   const d    = item.data?.[0] || {};
