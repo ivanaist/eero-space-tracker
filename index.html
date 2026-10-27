@@ -263,6 +263,70 @@
       text-align: center;
     }
 
+    /* ── Hubble section ──────────────────────────────────────────── */
+    .hubble-section {
+      margin-bottom: 40px;
+    }
+
+    .hubble-section .agency-header {
+      border-bottom-color: rgba(206, 147, 216, 0.3);
+    }
+
+    .hubble-section .agency-name {
+      color: #ce93d8;
+      text-shadow: 0 0 10px #ce93d8;
+    }
+
+    .hubble-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .hubble-card {
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      overflow: hidden;
+      border-left: 3px solid #ce93d8;
+      transition: background 0.2s;
+    }
+
+    .hubble-card:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .hubble-photo {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+      background: #0a0a1a;
+    }
+
+    .hubble-body {
+      padding: 14px;
+    }
+
+    .hubble-title {
+      font-size: 0.9em;
+      font-weight: bold;
+      color: #e1bee7;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .hubble-date {
+      font-size: 0.75em;
+      color: #78909c;
+      margin-bottom: 8px;
+    }
+
+    .hubble-desc {
+      font-size: 0.76em;
+      color: #78909c;
+      line-height: 1.5;
+    }
+
     footer {
       text-align: center;
       padding: 40px 20px;
@@ -312,7 +376,8 @@
       }
 
       /* Single column cards on mobile */
-      .launches-grid {
+      .launches-grid,
+      .hubble-grid {
         grid-template-columns: 1fr;
         gap: 12px;
       }
@@ -396,7 +461,18 @@
     </div>
   </div>
 
-  <footer>Data from RocketLaunch.Live &bull; Updates every 30 minutes</footer>
+  <!-- Hubble Space Telescope -->
+  <div class="agency-section hubble-section" id="section-hubble">
+    <div class="agency-header">
+      <div class="agency-logo">&#x1F52D;</div>
+      <div class="agency-name">Hubble Space Telescope</div>
+    </div>
+    <div class="hubble-grid" id="grid-hubble">
+      <div class="loading">Loading Hubble images...</div>
+    </div>
+  </div>
+
+  <footer>Launches: RocketLaunch.Live &bull; Images: NASA Image Library &bull; Updates every 30 min</footer>
 </div>
 
 <script>
@@ -590,12 +666,56 @@ async function loadLaunches() {
   }
 }
 
+// ── Hubble images ──────────────────────────────────────────────────────────
+const HUBBLE_API   = 'https://images-api.nasa.gov/search?q=hubble+space+telescope&media_type=image&page_size=6&year_start=2023';
+const HUBBLE_CACHE = 'hubble_images_v1';
+
+function hubbleCard(item) {
+  const d    = item.data?.[0] || {};
+  const thumb = item.links?.[0]?.href || '';
+  const title = d.title || 'Hubble Image';
+  const date  = d.date_created ? new Date(d.date_created).toDateString() : '';
+  const desc  = (d.description || '').slice(0, 160);
+  return `
+    <div class="hubble-card">
+      ${thumb ? `<img class="hubble-photo" src="${thumb}" alt="${title}" loading="lazy">` : ''}
+      <div class="hubble-body">
+        <div class="hubble-title">${title}</div>
+        ${date ? `<div class="hubble-date">&#x1F4F8; ${date}</div>` : ''}
+        ${desc  ? `<div class="hubble-desc">${desc}${d.description?.length > 160 ? '&hellip;' : ''}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function loadHubble() {
+  const grid = document.getElementById('grid-hubble');
+  try {
+    // Safe localStorage read — fails silently in restricted environments
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(HUBBLE_CACHE) || 'null'); } catch {}
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      grid.innerHTML = cached.html;
+      return;
+    }
+    const res  = await fetch(HUBBLE_API);
+    const data = await res.json();
+    const items = data.collection?.items || [];
+    if (!items.length) { grid.innerHTML = '<div class="no-launches">No images found.</div>'; return; }
+    const html = items.map(hubbleCard).join('');
+    grid.innerHTML = html;
+    try { localStorage.setItem(HUBBLE_CACHE, JSON.stringify({ ts: Date.now(), html })); } catch {}
+  } catch {
+    grid.innerHTML = '<div class="error-msg">Could not load Hubble images. Try refreshing.</div>';
+  }
+}
+
 // Tick countdowns every second
 setInterval(updateCountdowns, 1000);
 // Reload every 30 minutes
 setInterval(loadLaunches, 30 * 60 * 1000);
 
 loadLaunches();
+loadHubble();
 </script>
 </body>
 </html>
