@@ -396,7 +396,7 @@
     </div>
   </div>
 
-  <footer>Data from The Space Devs Launch Library &bull; Updates every 5 minutes</footer>
+  <footer>Data from RocketLaunch.Live &bull; Updates every 30 minutes</footer>
 </div>
 
 <script>
@@ -442,13 +442,29 @@ drawStars();
 window.addEventListener('resize', () => { resizeCanvas(); makeStars(300); });
 
 // ── Launch data ────────────────────────────────────────────────────────────
-const BASE = 'https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=5&mode=detailed&format=json';
-
-const AGENCY_QUERIES = {
-  nasa:       BASE + '&lsp__name__icontains=nasa',
-  spacex:     BASE + '&lsp__name__icontains=spacex',
-  blueorigin: BASE + '&lsp__name__icontains=blue+origin'
+// One request per agency from RocketLaunch.Live (no rate-limit issues)
+const APIS = {
+  spacex:     'https://fdo.rocketlaunch.live/json/launches/next/5?provider=spacex',
+  nasa:       'https://fdo.rocketlaunch.live/json/launches/next/5?provider=nasa',
+  blueorigin: 'https://fdo.rocketlaunch.live/json/launches/next/5?provider=blue-origin'
 };
+const CACHE_KEY = 'space_launches_v2';
+const CACHE_TTL = 30 * 60 * 1000;
+
+// Normalise RocketLaunch.Live fields to what renderCard expects
+function normalise(l) {
+  const site = [l.pad?.location?.name, l.pad?.location?.state].filter(Boolean).join(', ') || 'Unknown site';
+  return {
+    name:    l.name || 'Unknown Mission',
+    rocket:  l.vehicle?.name || '',
+    site,
+    net:     l.t0 || null,
+    status:  'Go',
+    mission: l.launch_description || '',
+    image:   null,
+    vidURLs: (l.media || []).map(m => ({ url: m.liveURL || m.url || '' }))
+  };
+}
 
 function statusBadge(abbrev) {
   const map = {
@@ -456,24 +472,20 @@ function statusBadge(abbrev) {
     'TBD':  ['Date TBD',      'status-tbd'],
     'TBC':  ['To Be Confirmed','status-tbd'],
     'Hold': ['Launch Hold',   'status-hold'],
-    'Success': ['Success',    'status-go'],
-    'Failure': ['Failed',     'status-hold'],
   };
-  const [label, cls] = map[abbrev] || [abbrev || 'Unknown', 'status-other'];
+  const [label, cls] = map[abbrev] || ['Upcoming', 'status-other'];
   return `<span class="status-badge ${cls}">${label}</span>`;
 }
 
 function formatDate(iso) {
-  if (!iso) return 'Date unknown';
+  if (!iso) return 'Date TBD';
   const d = new Date(iso);
   return d.toUTCString().replace('GMT', 'UTC');
 }
 
 function countdown(iso) {
   if (!iso) return '';
-  const now = Date.now();
-  const target = new Date(iso).getTime();
-  const diff = target - now;
+  const diff = new Date(iso).getTime() - Date.now();
   if (diff < 0) return '';
   const d = Math.floor(diff / 86400000);
   const h = Math.floor((diff % 86400000) / 3600000);
@@ -483,16 +495,11 @@ function countdown(iso) {
 }
 
 function renderCard(launch) {
-  const name    = launch.name || 'Unknown Mission';
-  const rocket  = launch.rocket?.configuration?.full_name || '';
-  const site    = launch.pad?.location?.name || launch.pad?.name || 'Unknown site';
-  const date    = formatDate(launch.net);
-  const status  = launch.status?.abbrev || '';
-  const mission = launch.mission?.description || '';
-  const img     = launch.image || launch.rocket?.configuration?.image_url || '';
-
+  const { name, rocket, site, net, status, mission, image } = launch;
+  const date = formatDate(net);
+  const img  = image || '';
   return `
-    <div class="launch-card" data-net="${launch.net || ''}">
+    <div class="launch-card" data-net="${net || ''}">
       ${img ? `<img class="rocket-image" src="${img}" alt="${rocket}" loading="lazy">` : ''}
       <div class="card-body">
         ${statusBadge(status)}
@@ -500,10 +507,10 @@ function renderCard(launch) {
         <div class="launch-rocket">&#x1F680; ${rocket}</div>
         <div class="launch-info">&#x1F4CD; <span>${site}</span></div>
         <div class="launch-info">&#x1F4C5; <span>${date}</span></div>
-        ${mission ? `<div class="launch-mission">${mission.slice(0, 150)}${mission.length > 150 ? '…' : ''}</div>` : ''}
+        ${mission ? `<div class="launch-mission">${mission.slice(0, 160)}${mission.length > 160 ? '&hellip;' : ''}</div>` : ''}
         <div class="countdown">
           <div class="countdown-label">T-MINUS</div>
-          <div class="countdown-time" data-net="${launch.net || ''}">--</div>
+          <div class="countdown-time" data-net="${net || ''}">--</div>
         </div>
       </div>
     </div>`;
@@ -525,86 +532,68 @@ function updateCountdowns() {
   });
 }
 
-function checkLiveVideo(launches) {
+function checkLiveVideo(all) {
   const area = document.getElementById('live-video-area');
-  const noLive = document.getElementById('no-live');
-
-  // Find a launch that is currently live (status "In Flight" or within 30min of NET)
-  const now = Date.now();
+  const now  = Date.now();
   let liveUrl = null;
-
-  for (const l of launches) {
-    const isInFlight = l.status?.abbrev === 'In Flight';
+  for (const l of all) {
     const netTime = l.net ? new Date(l.net).getTime() : null;
     const nearLaunch = netTime && Math.abs(now - netTime) < 30 * 60 * 1000;
-
-    if ((isInFlight || nearLaunch) && l.vidURLs && l.vidURLs.length > 0) {
-      const yt = l.vidURLs.find(v => v.url && v.url.includes('youtube'));
+    if (nearLaunch && l.vidURLs?.length) {
+      const yt = l.vidURLs.find(v => v.url?.includes('youtube') || v.url?.includes('youtu.be'));
       if (yt) {
-        // Convert watch URL to embed URL
         liveUrl = yt.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'www.youtube.com/embed/');
         break;
       }
     }
   }
-
-  if (liveUrl) {
-    area.innerHTML = `
-      <div id="live-video-container">
-        <iframe src="${liveUrl}?autoplay=1" allowfullscreen allow="autoplay"></iframe>
-      </div>`;
-  } else {
-    area.innerHTML = '<div id="no-live">No launch is live right now. Check back closer to launch time!</div>';
-  }
+  area.innerHTML = liveUrl
+    ? `<div id="live-video-container"><iframe src="${liveUrl}?autoplay=1" allowfullscreen allow="autoplay"></iframe></div>`
+    : '<div id="no-live">No launch is live right now. Check back closer to launch time!</div>';
 }
 
-// Agency keywords for client-side verification
-const VERIFY = {
-  nasa:       ['nasa'],
-  spacex:     ['spacex'],
-  blueorigin: ['blue origin']
-};
+async function fetchWithCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+  } catch {}
 
-function matchesAgency(launch, agency) {
-  const lsp = (launch.launch_service_provider?.name || '').toLowerCase();
-  return VERIFY[agency].some(k => lsp.includes(k));
-}
+  const [spacex, nasa, blueorigin] = await Promise.all(
+    Object.values(APIS).map(url =>
+      fetch(url).then(r => r.ok ? r.json() : { result: [] }).catch(() => ({ result: [] }))
+    )
+  );
 
-async function fetchAgency(url, agency) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('API error ' + res.status);
-  const data = await res.json();
-  const results = data.results || [];
-  return results.filter(l => matchesAgency(l, agency));
+  const buckets = {
+    spacex:     (spacex.result     || []).slice(0, 5).map(normalise),
+    nasa:       (nasa.result       || []).slice(0, 5).map(normalise),
+    blueorigin: (blueorigin.result || []).slice(0, 5).map(normalise)
+  };
+
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: buckets })); } catch {}
+  return buckets;
 }
 
 async function loadLaunches() {
   try {
-    const [nasa, spacex, blueorigin] = await Promise.all([
-      fetchAgency(AGENCY_QUERIES.nasa,       'nasa'),
-      fetchAgency(AGENCY_QUERIES.spacex,     'spacex'),
-      fetchAgency(AGENCY_QUERIES.blueorigin, 'blueorigin')
-    ]);
-
-    renderGrid('grid-nasa',       nasa);
-    renderGrid('grid-spacex',     spacex);
-    renderGrid('grid-blueorigin', blueorigin);
-
-    checkLiveVideo([...nasa, ...spacex, ...blueorigin]);
+    const buckets = await fetchWithCache();
+    renderGrid('grid-spacex',     buckets.spacex);
+    renderGrid('grid-nasa',       buckets.nasa);
+    renderGrid('grid-blueorigin', buckets.blueorigin);
+    checkLiveVideo([...buckets.spacex, ...buckets.nasa, ...buckets.blueorigin]);
     updateCountdowns();
-
-  } catch (e) {
+  } catch {
     ['grid-nasa', 'grid-spacex', 'grid-blueorigin'].forEach(id => {
       document.getElementById(id).innerHTML =
-        `<div class="error-msg">Could not load launches. Try refreshing the page.</div>`;
+        '<div class="error-msg">Could not load launches. Try refreshing.</div>';
     });
   }
 }
 
 // Tick countdowns every second
 setInterval(updateCountdowns, 1000);
-// Reload launch data every 5 minutes
-setInterval(loadLaunches, 5 * 60 * 1000);
+// Reload every 30 minutes
+setInterval(loadLaunches, 30 * 60 * 1000);
 
 loadLaunches();
 </script>
