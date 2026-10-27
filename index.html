@@ -838,28 +838,34 @@ async function loadLaunches() {
 // ── Hubble images ──────────────────────────────────────────────────────────
 // Science-only query: galaxies, nebulae, observations — no people or news
 const HUBBLE_API   = 'https://images-api.nasa.gov/search?q=hubble+galaxy+nebula+observation&media_type=image&page_size=9';
-const HUBBLE_CACHE = 'hubble_images_v2';
+const HUBBLE_CACHE = 'hubble_images_v3';
 
 function esc(str) {
   return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function hubbleCard(item) {
+function stripHTML(str) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = str || '';
+  return (tmp.textContent || tmp.innerText || '').trim();
+}
+
+let hubbleItems = [];
+
+function hubbleCard(item, idx) {
   const d     = item.data?.[0] || {};
   const thumb = item.links?.[0]?.href || '';
   const title = d.title || 'Hubble Image';
   const date  = d.date_created ? new Date(d.date_created).toDateString() : '';
-  const full  = d.description || '';
-  const preview = full.slice(0, 120);
+  const clean = stripHTML(d.description || '');
+  const preview = clean.slice(0, 120);
   return `
-    <div class="hubble-card"
-         onclick="openHubbleModal('${esc(thumb)}','${esc(title)}','${esc(date)}','${esc(full)}')"
-         role="button" tabindex="0">
+    <div class="hubble-card" data-hubble-idx="${idx}" role="button" tabindex="0">
       ${thumb ? `<img class="hubble-photo" src="${thumb}" alt="${esc(title)}" loading="lazy">` : ''}
       <div class="hubble-body">
         <div class="hubble-title">${title}</div>
         ${date ? `<div class="hubble-date">&#x1F4F8; ${date}</div>` : ''}
-        ${preview ? `<div class="hubble-desc">${preview}${full.length > 120 ? '&hellip;' : ''}</div>` : ''}
+        ${preview ? `<div class="hubble-desc">${preview}${clean.length > 120 ? '&hellip;' : ''}</div>` : ''}
         <div class="hubble-tap-hint">&#x1F4A5; Tap to read more</div>
       </div>
     </div>`;
@@ -891,20 +897,42 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHubbleM
 async function loadHubble() {
   const grid = document.getElementById('grid-hubble');
   try {
-    // Safe localStorage read — fails silently in restricted environments
     let cached = null;
     try { cached = JSON.parse(localStorage.getItem(HUBBLE_CACHE) || 'null'); } catch {}
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
-      grid.innerHTML = cached.html;
-      return;
+
+    let items;
+    if (cached && Date.now() - cached.ts < CACHE_TTL && cached.items) {
+      items = cached.items;
+    } else {
+      const res  = await fetch(HUBBLE_API);
+      const data = await res.json();
+      items = data.collection?.items || [];
+      try { localStorage.setItem(HUBBLE_CACHE, JSON.stringify({ ts: Date.now(), items })); } catch {}
     }
-    const res  = await fetch(HUBBLE_API);
-    const data = await res.json();
-    const items = data.collection?.items || [];
+
     if (!items.length) { grid.innerHTML = '<div class="no-launches">No images found.</div>'; return; }
-    const html = items.map(hubbleCard).join('');
-    grid.innerHTML = html;
-    try { localStorage.setItem(HUBBLE_CACHE, JSON.stringify({ ts: Date.now(), html })); } catch {}
+    hubbleItems = items;
+    grid.innerHTML = items.map(hubbleCard).join('');
+
+    grid.addEventListener('click', e => {
+      const card = e.target.closest('[data-hubble-idx]');
+      if (!card) return;
+      const item = hubbleItems[parseInt(card.dataset.hubbleIdx)];
+      if (!item) return;
+      const d = item.data?.[0] || {};
+      openHubbleModal(
+        item.links?.[0]?.href || '',
+        d.title || 'Hubble Image',
+        d.date_created ? new Date(d.date_created).toDateString() : '',
+        stripHTML(d.description || '')
+      );
+    });
+    grid.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const card = e.target.closest('[data-hubble-idx]');
+        if (card) card.click();
+      }
+    });
   } catch {
     grid.innerHTML = '<div class="error-msg">Could not load Hubble images. Try refreshing.</div>';
   }
