@@ -139,13 +139,26 @@
     .launch-card {
       background: rgba(255,255,255,0.04);
       border-radius: 12px;
-      padding: 18px;
+      overflow: hidden;
       border-left: 3px solid;
       transition: background 0.2s;
     }
 
     .launch-card:hover {
       background: rgba(255,255,255,0.08);
+    }
+
+    .rocket-image {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      object-position: center top;
+      display: block;
+      background: #111;
+    }
+
+    .card-body {
+      padding: 18px;
     }
 
     .nasa .launch-card  { border-color: #4fc3f7; }
@@ -403,18 +416,22 @@ function renderCard(launch) {
   const date    = formatDate(launch.net);
   const status  = launch.status?.abbrev || '';
   const mission = launch.mission?.description || '';
+  const img     = launch.image || launch.rocket?.configuration?.image_url || '';
 
   return `
     <div class="launch-card" data-net="${launch.net || ''}">
-      ${statusBadge(status)}
-      <div class="launch-name">${name}</div>
-      <div class="launch-rocket">&#x1F680; ${rocket}</div>
-      <div class="launch-info">&#x1F4CD; <span>${site}</span></div>
-      <div class="launch-info">&#x1F4C5; <span>${date}</span></div>
-      ${mission ? `<div class="launch-mission">${mission.slice(0, 150)}${mission.length > 150 ? '…' : ''}</div>` : ''}
-      <div class="countdown">
-        <div class="countdown-label">T-MINUS</div>
-        <div class="countdown-time" data-net="${launch.net || ''}">--</div>
+      ${img ? `<img class="rocket-image" src="${img}" alt="${rocket}" loading="lazy">` : ''}
+      <div class="card-body">
+        ${statusBadge(status)}
+        <div class="launch-name">${name}</div>
+        <div class="launch-rocket">&#x1F680; ${rocket}</div>
+        <div class="launch-info">&#x1F4CD; <span>${site}</span></div>
+        <div class="launch-info">&#x1F4C5; <span>${date}</span></div>
+        ${mission ? `<div class="launch-mission">${mission.slice(0, 150)}${mission.length > 150 ? '…' : ''}</div>` : ''}
+        <div class="countdown">
+          <div class="countdown-label">T-MINUS</div>
+          <div class="countdown-time" data-net="${launch.net || ''}">--</div>
+        </div>
       </div>
     </div>`;
 }
